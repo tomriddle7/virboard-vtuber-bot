@@ -1,0 +1,42 @@
+name: Update VTuber Events
+
+on:
+  schedule:
+    # 매일 한국 시간(KST) 오전 9시, 오후 9시에 실행 (UTC 기준 0시, 12시)
+    - cron: '0 0,12 * * *'
+  workflow_dispatch: # GitHub Actions 탭에서 수동으로 즉시 실행할 수 있는 버튼 활성화
+
+permissions:
+  contents: write # 봇이 수집한 데이터를 저장소에 커밋 & 푸시할 수 있도록 쓰기 권한 부여
+
+jobs:
+  search-and-update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 2. Python 환경 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 3. 필수 라이브러리 설치
+        run: pip install requests
+
+      - name: 4. 검색, RSS 생성 및 알림 발송 스크립트 실행
+        env:
+          SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          SITE_URL: "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+        run: python bot.py
+
+      - name: 5. 변경된 데이터(events.json, rss.xml) 저장소에 자동 커밋 & 푸시
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add events.json rss.xml
+          # 변경된 내용이 있을 때만 커밋하고 푸시합니다 (에러 방지)
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: 일자별 행사 데이터 및 RSS 자동 업데이트" && git push)

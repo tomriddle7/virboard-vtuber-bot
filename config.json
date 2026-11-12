@@ -1,0 +1,17 @@
+{
+  "keyword_queries": [
+    "site:x.com (\"생일 광고\" OR \"생일광고\" OR \"지하철 광고\") (\"버튜버\" OR \"홀로라이브\" OR \"스텔라이브\" OR \"니지산지\" OR \"이세돌\" OR \"플레이브\")"
+  ],
+  "target_accounts": [
+    {
+      "username": "vtuber_event_kr",
+      "name": "버튜버 행사 알림 계정 (예시1)",
+      "filter_keywords": ""
+    },
+    {
+      "username": "sub_ad_info",
+      "name": "서브컬처 광고 아카이브 (예시2)",
+      "filter_keywords": "버튜버 OR 생일"
+    }
+  ]
+}

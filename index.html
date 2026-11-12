@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>버튜버 생일 광고 & 팬 행사 아카이브</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- X(Twitter) 공식 임베드 위젯 스크립트 -->
+  <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+  <!-- 상단 헤더 -->
+  <header class="bg-indigo-600 text-white py-8 shadow-md">
+    <div class="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div>
+        <h1 class="text-2xl md:text-3xl font-bold">🎂 버튜버 생일 광고 & 팬 행사 아카이브</h1>
+        <p class="text-indigo-100 mt-1.5 text-sm">매일 정기적으로 수집되는 버튜버 응원 광고 및 생일 카페 정보입니다.</p>
+      </div>
+      <div class="flex items-center gap-2 self-start sm:self-auto">
+        <a href="./rss.xml" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-3.5 py-2 rounded-lg shadow transition">
+          📡 RSS 구독
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 py-8">
+    <!-- 검색, 필터 및 옵션 컨트롤 바 -->
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 space-y-4">
+      <div class="flex flex-col md:flex-row gap-3">
+        <input id="searchInput" type="text" placeholder="버튜버 이름, 소속사, 지하철역, 카페 키워드 검색..." 
+               class="flex-1 px-4 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <select id="typeFilter" class="px-4 py-2 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="all">전체 출처 보기</option>
+          <option value="account">전문 계정 출처만</option>
+          <option value="keyword">일반 키워드 검색만</option>
+        </select>
+        <label class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-xs font-medium cursor-pointer select-none">
+          <input id="autoEmbedToggle" type="checkbox" checked class="rounded text-indigo-600 focus:ring-indigo-500">
+          <span>트윗 포스터 자동 표시</span>
+        </label>
+      </div>
+
+      <!-- 원클릭 빠른 필터 태그 (4-1 목표 포함) -->
+      <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100">
+        <span class="text-xs font-semibold text-slate-400 mr-1">빠른 태그:</span>
+        <button data-tag="" class="quick-tag bg-indigo-600 text-white text-xs px-3 py-1 rounded-full font-medium transition">전체</button>
+        <button data-tag="홀로라이브" class="quick-tag bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3 py-1 rounded-full font-medium transition">홀로라이브</button>
+        <button data-tag="스텔라이브" class="quick-tag bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3 py-1 rounded-full font-medium transition">스텔라이브</button>
+        <button data-tag="이세돌" class="quick-tag bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3 py-1 rounded-full font-medium transition">이세돌</button>
+        <button data-tag="니지산지" class="quick-tag bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3 py-1 rounded-full font-medium transition">니지산지</button>
+        <button data-tag="플레이브" class="quick-tag bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3 py-1 rounded-full font-medium transition">플레이브</button>
+        <button data-tag="생일카페" class="quick-tag bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3 py-1 rounded-full font-medium transition">🎂 생일카페</button>
+        <button data-tag="지하철" class="quick-tag bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3 py-1 rounded-full font-medium transition">🚇 지하철 광고</button>
+      </div>
+    </div>
+
+    <!-- 일자별 행사 리스트 컨테이너 -->
+    <div id="timelineContainer" class="space-y-10">
+      <p class="text-center text-slate-500 py-10">데이터를 불러오는 중입니다...</p>
+    </div>
+  </main>
+
+  <script>
+    let allEvents = [];
+    let tweetObserver = null;
+
+    // URL에서 트윗 ID 추출
+    function extractTweetId(url) {
+      if (!url) return null;
+      const match = url.match(/status\/(\d+)/);
+      return match ? match[1] : null;
+    }
+
+    // HTML 이스케이프
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // 개별 트윗 임베드 렌더링
+    function loadTweetEmbed(containerEl) {
+      if (!containerEl || containerEl.dataset.loaded === 'true') return;
+      const tweetId = containerEl.dataset.tweetId;
+      if (!tweetId) return;
+
+      containerEl.dataset.loaded = 'true';
+      containerEl.innerHTML = '<p class="text-xs text-slate-400 py-3 text-center">트윗 화면을 불러오는 중...</p>';
+
+      const render = () => {
+        if (window.twttr && window.twttr.widgets) {
+          containerEl.innerHTML = '';
+          window.twttr.widgets.createTweet(tweetId, containerEl, {
+            theme: 'light',
+            align: 'center',
+            dnt: true
+          }).then(el => {
+            if (!el) {
+              containerEl.innerHTML = '<p class="text-xs text-slate-400 py-2 text-center">트윗 미리보기를 불러올 수 없습니다 (원문 링크를 확인해 주세요).</p>';
+            }
+          });
+        } else {
+          setTimeout(render, 300);
+        }
+      };
+      render();
+    }
+
+    // IntersectionObserver로 화면에 보이는 트윗만 지연 로딩 (Lazy Loading)
+    function setupLazyTweetObserver() {
+      if (tweetObserver) {
+        tweetObserver.disconnect();
+      }
+
+      const autoEmbed = document.getElementById('autoEmbedToggle').checked;
+      if (!autoEmbed) return;
+
+      tweetObserver = new IntersectionObserver((entries, obs) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            loadTweetEmbed(entry.target);
+            obs.unobserve(entry.target);
+          }
+        });
+      }, { rootMargin: '200px 0px' });
+
+      document.querySelectorAll('.tweet-embed-box').forEach(box => {
+        if (!box.classList.contains('hidden') && box.dataset.loaded !== 'true') {
+          tweetObserver.observe(box);
+        }
+      });
+    }
+
+    // 개별 카드의 트윗 접기/펼치기 버튼 핸들러
+    window.toggleTweetBox = function(btnEl) {
+      const card = btnEl.closest('article');
+      const box = card.querySelector('.tweet-embed-box');
+      if (!box) return;
+
+      const isHidden = box.classList.contains('hidden');
+      if (isHidden) {
+        box.classList.remove('hidden');
+        btnEl.textContent = '트윗 접기 ▲';
+        loadTweetEmbed(box);
+      } else {
+        box.classList.add('hidden');
+        btnEl.textContent = '트윗 포스터 보기 ▼';
+      }
+    };
+
+    async function fetchEvents() {
+      try {
+        const res = await fetch('./events.json?t=' + new Date().getTime());
+        allEvents = await res.json();
+        renderEvents();
+      } catch (err) {
+        document.getElementById('timelineContainer').innerHTML = 
+          '<p class="text-center text-red-500 py-10">데이터를 불러오지 못했습니다.</p>';
+      }
+    }
+
+    function renderEvents() {
+      const container = document.getElementById('timelineContainer');
+      const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
+      const filterType = document.getElementById('typeFilter').value;
+      const autoEmbed = document.getElementById('autoEmbedToggle').checked;
+
+      const filtered = allEvents.filter(ev => {
+        const matchesType = filterType === 'all' || ev.source_type === filterType;
+        const haystack = `${ev.title || ''} ${ev.snippet || ''} ${ev.source_name || ''}`.toLowerCase();
+        const matchesKeyword = !keyword || haystack.includes(keyword);
+        return matchesType && matchesKeyword;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<p class="text-center text-slate-400 py-12">조건에 맞는 행사 정보가 없습니다.</p>';
+        return;
+      }
+
+      // 수집 일자(YYYY-MM-DD)별로 그룹화
+      const grouped = filtered.reduce((acc, ev) => {
+        const dateKey = ev.date || '날짜 미상';
+        acc[dateKey] = acc[dateKey] || [];
+        acc[dateKey].push(ev);
+        return acc;
+      }, {});
+
+      const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+
+      container.innerHTML = sortedDates.map(date => `
+        <section>
+          <div class="flex items-center gap-3 mb-4">
+            <span class="bg-indigo-600 text-white text-sm font-semibold px-3.5 py-1 rounded-full shadow-sm">
+              📅 ${escapeHtml(date)} 수집 (${grouped[date].length}건)
+            </span>
+            <div class="h-px bg-slate-200 flex-1"></div>
+          </div>
+          <!-- 반응형 2열 그리드 -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+            ${grouped[date].map(ev => {
+              const tweetId = extractTweetId(ev.link);
+              return `
+                <article class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 hover:border-indigo-400 transition flex flex-col justify-between">
+                  <div>
+                    <div class="flex items-center justify-between gap-2 mb-2.5">
+                      <span class="text-xs font-medium px-2.5 py-0.5 rounded ${
+                        ev.source_type === 'account' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                      }">
+                        ${escapeHtml(ev.source_name)}
+                      </span>
+                      <div class="flex items-center gap-2">
+                        ${tweetId ? `
+                          <button type="button" onclick="toggleTweetBox(this)"
+                                  class="text-xs font-medium text-slate-500 hover:text-indigo-600">
+                            ${autoEmbed ? '트윗 접기 ▲' : '트윗 포스터 보기 ▼'}
+                          </button>
+                        ` : ''}
+                        <a href="${escapeHtml(ev.link)}" target="_blank" rel="noopener" 
+                           class="text-xs font-semibold text-indigo-600 hover:underline">
+                          X 원문 보기 ↗
+                        </a>
+                      </div>
+                    </div>
+                    <h2 class="font-bold text-slate-900 text-base mb-1.5 leading-snug">${escapeHtml(ev.title)}</h2>
+                    <p class="text-sm text-slate-600 leading-relaxed">${escapeHtml(ev.snippet)}</p>
+                  </div>
+
+                  ${tweetId ? `
+                    <div class="tweet-embed-box mt-3 pt-3 border-t border-slate-100 ${autoEmbed ? '' : 'hidden'}"
+                         data-tweet-id="${tweetId}" data-loaded="false">
+                    </div>
+                  ` : ''}
+                </article>
+              `;
+            }).join('')}
+          </div>
+        </section>
+      `).join('');
+
+      setupLazyTweetObserver();
+    }
+
+    // 빠른 필터 태그 클릭 이벤트
+    document.querySelectorAll('.quick-tag').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tag = btn.dataset.tag || '';
+        document.getElementById('searchInput').value = tag;
+
+        document.querySelectorAll('.quick-tag').forEach(b => {
+          b.classList.remove('bg-indigo-600', 'text-white');
+          b.classList.add('bg-slate-100', 'text-slate-700');
+        });
+        btn.classList.remove('bg-slate-100', 'text-slate-700');
+        btn.classList.add('bg-indigo-600', 'text-white');
+
+        renderEvents();
+      });
+    });
+
+    document.getElementById('searchInput').addEventListener('input', renderEvents);
+    document.getElementById('typeFilter').addEventListener('change', renderEvents);
+    document.getElementById('autoEmbedToggle').addEventListener('change', renderEvents);
+    fetchEvents();
+  </script>
+</body>
+</html>
