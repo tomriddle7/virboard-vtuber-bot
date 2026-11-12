@@ -1,14 +1,14 @@
 {
-  "search_period": "qdr:m",
+  "search_period": "qdr:w",
   "keyword_queries": [
-    "site:x.com 버튜버 생일카페",
-    "site:x.com 버튜버 생일광고",
-    "site:x.com 스텔라이브 생일카페",
-    "site:x.com 홀로라이브 생일카페",
-    "site:x.com 이세계아이돌 생일카페",
-    "site:x.com 플레이브 생일카페",
-    "site:x.com 니지산지 생일카페",
-    "site:x.com 버튜버 지하철 광고"
+    "site:x.com \"생일카페\" 버튜버 OR 스텔라이브 OR 홀로라이브 OR 이세계아이돌 OR 플레이브 OR 니지산지",
+    "site:x.com \"생일광고\" OR \"지하철 광고\" 버튜버 OR 스텔라이브 OR 홀로라이브 OR 이세계아이돌 OR 플레이브"
   ],
-  "target_accounts": []
+  "target_accounts": [
+    {
+      "username": "with_StelLive",
+      "name": "비공식 스텔라이브 총공정보계정",
+      "filter_keywords": "실트"
+    }
+  ]
 }
